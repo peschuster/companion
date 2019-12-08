@@ -20,8 +20,12 @@ if (process.env.DEVELOPER !== undefined) {
 	process.env['DEBUG'] = '*,-websocket*,-express*,-engine*,-socket.io*,-send*,-db,-NRC*,-follow-redirects,-electron-timer-fix';
 }
 
-// Fix timers in electron
-require('./electron-timer-fix').fix();
+if (process.versions.hasOwnProperty('electron')) {
+	// Fix timers in electron
+	require('./electron-timer-fix').fix();
+} else {
+	console.log("SKIP_TIMERFIX - Skipping the electron-timer-fix");
+}
 
 global.MAX_BUTTONS = 32;
 global.MAX_BUTTONS_PER_ROW = 8;
