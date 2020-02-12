@@ -79,6 +79,7 @@
 	"dependencies": {
 		"@coreui/coreui": "^2.0.0-rc.2",
 		"@coreui/coreui-plugin-chartjs-custom-tooltips": "1.2.0",
+		"@julusian/jpeg-turbo": "^0.5.2",
 		"app-root-path": "^2.0.1",
 		"aws-sdk": "^2.582.0",
 		"binopsy": "^0.0.0",
@@ -125,8 +126,5 @@
 	"collective": {
 		"type": "donorbox",
 		"url": "https://donorbox.org/bitfocus-opensource"
-	},
-	"optionalDependencies": {
-		"@julusian/jpeg-turbo": "^0.5.2"
 	}
 }
