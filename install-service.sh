@@ -1,6 +1,6 @@
 #!/bin/bash
 NAME=companion
-SERVICE_PATH=/etc/systemd/system/${companion}.service
+SERVICE_PATH=/etc/systemd/system/${NAME}.service
 
 USAGE="sudo ./install-service.sh"
 
@@ -27,6 +27,6 @@ EOF
 printf "\nInstalling service to: $SERVICE_PATH\n"
 echo "$UNIT_FILE" > $SERVICE_PATH
 systemctl daemon-reload
-systemctl enable --no-pager ${companion}.service
-systemctl restart --no-pager ${companion}.service
-systemctl status --no-pager ${companion}.service
+systemctl enable --no-pager ${NAME}.service
+systemctl restart --no-pager ${NAME}.service
+systemctl status --no-pager ${NAME}.service
