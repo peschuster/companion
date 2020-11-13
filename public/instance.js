@@ -74,6 +74,11 @@ $(function() {
 				$("#instance_status_"+x).html("ERROR").attr('title', s[1]).removeClass('instance-status-ok').removeClass('instance-status-warn').removeClass('instance-status-disabled').addClass('instance-status-error')
 			}
 
+			// unknown
+            else if (s[0] === null) {
+                $("#instance_status_"+x).html(""+s[1]).attr('title', s[1]).removeClass('instance-status-ok').removeClass('instance-status-error').removeClass('instance-status-disabled').removeClass('instance-status-warn')
+            }
+
 		}
 	}
 
@@ -315,22 +320,31 @@ $(function() {
 		$addInstance = $("#addInstance");
 		$addInstanceByManufacturer = $("#addInstanceByManufacturer");
 
-		if (instance_category !== undefined) {
+		function compareCaseInsensitive(a, b){
+			var a2 = a.toLowerCase();
+			var b2 = b.toLowerCase();
+			if (a2 < b2) {return -1;}
+			if (a2 > b2) {return 1;}
+			return 0;
+		}
 
-			for (var n in instance_category) {
+		function compileChildNodes(obj, $instanceListElm) {
+			const category_names = Object.keys(obj).sort(compareCaseInsensitive)
+			for (var n of category_names) {
 
 				var $entry_li = $('<li class="dropdown-submenu"></li>');
 				var $entry_title = $('<div tabindex="-1" class="dropdown-content"></div>');
 
 				$entry_title.text(n);
 				$entry_li.append($entry_title);
-				$addInstance.append($entry_li);
+				$instanceListElm.append($entry_li);
 
 				var $entry_sub_ul = $('<ul class="dropdown-menu"></ul>');
 
-				for ( var sub in instance_category[n] ) {
+				var child_elms = []
+				for ( var sub in obj[n] ) {
 
-					var inx = instance_category[n][sub];
+					var inx = obj[n][sub];
 					var res_id = inx;
 					var res_name = instance_name[inx];
 					var main_split = res_name.split(":");
@@ -340,46 +354,29 @@ $(function() {
 					for (var prod in prods) {
 						var subprod = manuf + " " + prods[prod];
 						var $entry_sub_li = $('<li><div class="dropdown-content instance-addable" data-id="'+res_id+'" data-product="'+prods[prod]+'">'+subprod+'</div></li>');
-						$entry_sub_ul.append($entry_sub_li);
+						child_elms.push({
+							name: manuf + " " + prods[prod],
+							elm: $entry_sub_li
+						})
 					}
+				}
 
+				child_elms.sort((a, b) => compareCaseInsensitive(a.name, b.name))
+				for ( var elm of child_elms ) {
+					$entry_sub_ul.append(elm.elm);
 				}
 
 				$entry_li.append($entry_sub_ul);
 
 			}
+		}
 
-			for (var n in instance_manufacturer) {
+		if (instance_category !== undefined) {
+			compileChildNodes(instance_category, $addInstance)
+		}
 
-				var $entry_li = $('<li class="dropdown-submenu"></li>');
-				var $entry_title = $('<div tabindex="-1" class="dropdown-content"></div>');
-
-				$entry_title.text(n);
-				$entry_li.append($entry_title);
-				$addInstanceByManufacturer.append($entry_li);
-
-				var $entry_sub_ul = $('<ul class="dropdown-menu"></ul>');
-
-				for ( var sub in instance_manufacturer[n] ) {
-
-					var inx = instance_manufacturer[n][sub];
-					var res_name = instance_name[inx];
-					var main_split = res_name.split(":");
-					var manuf = main_split[0];
-					var prods = main_split[1].split(";");
-
-					for (var prod in prods) {
-						var subprod = manuf + " " + prods[prod];
-						var $entry_sub_li = $('<li><div class="dropdown-content instance-addable" data-id="'+inx+'" data-product="'+prods[prod]+'">'+subprod+'</div></li>');
-						$entry_sub_ul.append($entry_sub_li);
-					}
-
-				}
-
-				$entry_li.append($entry_sub_ul);
-
-			}
-
+		if (instance_manufacturer !== undefined) {
+			compileChildNodes(instance_manufacturer, $addInstanceByManufacturer)
 		}
 
 	});
@@ -536,7 +533,20 @@ $(function() {
 
 		for (var n in store.module) {
 			if (store.module[n].name === store.db[id].instance_type) {
-				$('#instanceConfig h4:first').text( store.module[n].shortname + ' configuration');
+
+				var help = '';
+				if (store.module[n].help) {
+					help = '<div class="instance_help"><i class="fa fa-question-circle"></i></div>';
+				}
+
+				$('#instanceConfig h4:first').html(help + store.module[n].shortname + ' configuration');
+
+				(function (name) {
+					$('#instanceConfig').find('.instance_help').click(function () {
+						show_module_help(name);
+					});
+				})(store.module[n].name);
+
 			}
 		}
 
@@ -691,7 +701,7 @@ $(function() {
 
 				$sm.append($inp);
 			}
-			
+
 			else if (field.type == 'checkbox') {
 				var $opt_checkbox = $("<input type='checkbox' class='form-control instanceConfigField'>");
 
@@ -707,14 +717,14 @@ $(function() {
 					.data('type', 'checkbox')
 					.data('valid', true)
 					.prop('checked', field.default);
-	
+
 				$sm.append($opt_checkbox);
 
 			}
 
 			else if (field.type == 'number') {
 				let $opt_num = $("<input type='number' class='form-control instanceConfigField'>");
-				
+
 				if (field.tooltip !== undefined) {
 					$opt_num.attr('title', field.tooltip);
 				}
@@ -733,7 +743,7 @@ $(function() {
 						validateNumericField($opt);
 					});
 				})(field, $opt_num);
-		
+
 				$sm.append($opt_num);
 
 			}

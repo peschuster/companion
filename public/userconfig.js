@@ -32,6 +32,16 @@ $(function() {
 			$cb.prop('checked', false);
 		}
 
+		// set the external keymapping option
+		var state = userconfig.emulator_control_enable;
+		var $cb = $('#userconfig_emulator_control_enable');
+
+		if (state === true) {
+			$cb.prop('checked', true);
+		} else {
+			$cb.prop('checked', false);
+		}
+
 		// enable pincode lockouts
 		var state = userconfig.pin_enable;
 		var $cb = $('#userconfig_pin_enable');
@@ -88,6 +98,16 @@ $(function() {
 		var $cb = $('#userconfig_artnet_channel');
 		$cb.val(state);
 
+		// set the artnet enabled option
+		var state = userconfig.rosstalk_enabled;
+		var $cb = $('#userconfig_rosstalk_enabled');
+
+		if (state === true) {
+			$cb.prop('checked', true);
+		} else {
+			$cb.prop('checked', false);
+		}
+
 	};
 
 
@@ -98,6 +118,17 @@ $(function() {
 			socket.emit('set_userconfig_key', 'page_direction_flipped', true);
 		} else {
 			socket.emit('set_userconfig_key', 'page_direction_flipped', false);
+		}
+	});
+
+	// when emulator_control_enable is changed from the userConfig tab
+	$('#userconfig_emulator_control_enable').click(function() {
+		if ($(this).prop('checked') == true) {
+			socket.emit('set_userconfig_key', 'emulator_control_enable', true);
+			window.open('emulator.html');
+		} else {
+			socket.emit('set_userconfig_key', 'emulator_control_enable', false);
+			window.open('emulator.html');
 		}
 	});
 
@@ -131,6 +162,14 @@ $(function() {
 			socket.emit('set_userconfig_key', 'artnet_enabled', true);
 		} else {
 			socket.emit('set_userconfig_key', 'artnet_enabled', false);
+		}
+	});
+
+	$('#userconfig_rosstalk_enabled').click(function() {
+		if ($(this).prop('checked') == true) {
+			socket.emit('set_userconfig_key', 'rosstalk_enabled', true);
+		} else {
+			socket.emit('set_userconfig_key', 'rosstalk_enabled', false);
 		}
 	});
 

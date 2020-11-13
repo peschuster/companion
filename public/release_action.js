@@ -30,8 +30,6 @@ function hex2int(hex) {
 }
 
 $(function() {
-	socket.emit('release_actions_get');
-
 	var $aba = $("#addBankReleaseAction");
 	$aba.select2({
 		theme: 'option',
@@ -361,7 +359,7 @@ $(function() {
 							$opt_input.trigger('change');
 						}
 
-						if (option.type == 'dropdown-native') {
+						else if (option.type == 'dropdown-native') {
 
 							var $opt_input = $("<select class='release-action-option-change form-control'></select>");
 							$opt_input.data('release-action-id', action.id);
