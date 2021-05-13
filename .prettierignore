@@ -1,0 +1,10 @@
+package.json
+lib/module/*
+lib/font.js
+lib/satellite_protocol.js
+electron-output/
+webui/package.json
+webui/build/
+webui/public/legacy
+/LICENSE.md
+docs/*

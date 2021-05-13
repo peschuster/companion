@@ -16,24 +16,34 @@
 # disclosing the source code of your own applications.
 #
 
+# exit when any command fails
+
 function heading() {
 	echo -e "\033[1m$1\033[m"
 }
 
-heading "Core"
-yarn
-echo
-heading "Bitfocus skeleton"
-yarn --cwd bitfocus-skeleton/
-echo
-heading "Module dependencies"
+heading "Check Node version"
+NODE_VERSION=$(node -v)
+NODE_IS_CORRECT=$(npx semver --range "^12.18.3 || ^14" $NODE_VERSION)
+echo "Found ${NODE_VERSION}"
+if [ "$NODE_IS_CORRECT" ]; then
+	echo "Node version is OK "
+else
+	echo "The installed version of NodeJS is not supported, v12.18.3+ is required."
+	echo "It is recommended that you update NodeJS (the same way you installed it)."
+	echo "Alternatively, you can run \`git checkout stable-2.1\` and \`yarn update\` to stick to future 2.1 versions, but this is unlikely to get many (if any) updates"
+	exit 7
+fi
 
-for module in lib/module/*/; do
-	grep '"dependencies"' ${module}package.json > /dev/null 2>&1 && (
-		echo ${module}
-		yarn --cwd ${module}
-		echo ""
-	)
-done
+set -e
+
+heading "Core"
+yarn --frozen-lockfile
+echo
+
+heading "UI"
+yarn --frozen-lockfile --cwd webui
+yarn --cwd webui build
+echo
 
 exit 0
