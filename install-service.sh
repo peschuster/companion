@@ -14,7 +14,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$(pwd)
 Environment="COMPANION_CONFIG_BASEDIR=/home/pi"
-ExecStart=node headless.js 0.0.0.0 8000
+ExecStart=node headless_ip.js 0.0.0.0 8000
 KillSignal=SIGINT
 TimeoutStopSec=60
 Restart=on-failure
