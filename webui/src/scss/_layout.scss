@@ -62,7 +62,7 @@ body {
 		position: relative;
 	}
 
-	max-width: 1500px;
+	max-width: 1900px;
 	min-height: 300px;
 	max-height: 100%;
 }
@@ -97,12 +97,26 @@ body {
 .secondary-panel-inner {
 	box-shadow: -15px -0px 25px -20px rgba(0, 0, 0, 0.3);
 
-	overflow-y: hid;
+	overflow-y: hidden;
 }
 
 .secondary-panel {
 	padding-left: 15px;
 	padding-top: 5px;
+
+	display: grid;
+	grid-template-rows: auto 1fr;
+	row-gap: 5px;
+
+	.secondary-panel-header {
+		grid-row: 1;
+		grid-column: 1;
+	}
+
+	.secondary-panel-inner {
+		grid-row: 2;
+		grid-column: 1;
+	}
 }
 
 .secondary-panel .tab-content {
@@ -137,7 +151,32 @@ body {
 	}
 }
 
+// For bigger screens, like 1440p and 4K, alow scaling
+@media only screen and (min-width: 2000px) {
+	.tab-content {
+		max-width: 100%;
+	}
+
+	.col-xl-6 {
+		max-width: 100%;
+	}
+
+	.split-panels {
+		> .primary-panel {
+			flex: 0 0 40%;
+		}
+
+		> .secondary-panel {
+			flex: 0 0 60%;
+		}
+	}
+}
+
 code {
 	color: #d50215;
 	font-weight: bold;
+}
+
+.img-max-width img {
+	max-width: 100%;
 }

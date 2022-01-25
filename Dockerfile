@@ -1,26 +1,46 @@
-FROM node:12
-# Reference: https://nodejs.org/en/docs/guides/nodejs-docker-webapp/
+FROM node:14
 
-WORKDIR /root
-ENV APPDIR=/root
-ENV ELECTRON_CACHE=$HOME/.cache/electron
-ENV ELECTRON_BUILDER_CACHE=$HOME/.cache/electron-builder
-ENV PATH="$HOME/.yarn/bin:$PATH"
+# User variable, define where to store the application config
+ENV COMPANION_CONFIG_BASEDIR=/config
 
-# Clone repository and set as workdir 
-RUN cd /root && \
-    git clone https://github.com/bitfocus/companion.git && \
-    mv companion/.[!.]* . && \
-    mv companion/* . && \
-    rm -rf companion && \
+WORKDIR /app
+COPY . /app/
 
-    # Installation Prep
-    curl -L https://yarnpkg.com/latest.tar.gz | tar xvz && mv yarn-v* $HOME/.yarn && \
-    apt-get update && apt-get install -y --no-install-recommends apt-utils \ 
+# Installation Prep
+RUN apt-get update && apt-get install -y \
+    libusb-1.0-0-dev \
     libudev-dev \
-    libgusb-dev && \
-    $APPDIR/tools/update.sh && \
-    $APPDIR/tools/build_writefile.sh
+    unzip \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
 
+# Generate version number file
+RUN ./tools/build_writefile.sh
+
+# Install dependencies
+RUN ./tools/yarn.sh
+
+# strip back unnecessary dependencies
+RUN yarn --frozen-lockfile --prod
+
+# Delete the webui source
+RUN mv webui/build webui-build \
+    && rm -R webui \
+    && mkdir webui \
+    && mv webui-build webui/build
+
+# TODO - module-local-dev dependencies
+
+# cleanup up some stuff that shouldnt be preserved
+RUN rm -R .git
+
+# make the production image
+FROM node:14-slim
+
+WORKDIR /app
+COPY --from=0 /app/	/app/
+
+# Bind to 0.0.0.0, as access should be scoped down by how the port is exposed from docker
+USER node
 EXPOSE 8000
-ENTRYPOINT ["./headless.js", "eth0"]
+ENTRYPOINT ["./headless_ip.js", "0.0.0.0"]

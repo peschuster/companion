@@ -8,7 +8,7 @@ var system = require('./app.js')
 var fs = require('fs')
 var exec = require('child_process').exec
 const { init, showReportDialog, configureScope } = require('@sentry/electron')
-var network = require('network')
+const systeminformation = require('systeminformation')
 
 // Ensure there isn't another instance of companion running already
 var lock = app.requestSingleInstanceLock()
@@ -115,14 +115,20 @@ function createWindow() {
 	})
 
 	ipcMain.on('network-interfaces:get', function () {
-		network.get_interfaces_list(function (err, list) {
-			const interfaces = [{ id: '127.0.0.1', label: 'localhost / 127.0.0.1' }]
+		systeminformation.networkInterfaces().then(function (list) {
+			const interfaces = [
+				{ id: '0.0.0.0', label: 'All Interfaces: 0.0.0.0' },
+				{ id: '127.0.0.1', label: 'localhost: 127.0.0.1' },
+			]
 
 			for (const obj of list) {
-				if (obj.ip_address !== null) {
+				if (obj.ip4 && !obj.internal) {
+					let label = `${obj.iface}: ${obj.ip4}`
+					if (obj.type && obj.type !== 'unknown') label += ` (${obj.type})`
+
 					interfaces.push({
-						id: obj.ip_address,
-						label: `${obj.name}: ${obj.ip_address} (${obj.type})`,
+						id: obj.ip4,
+						label: label,
 					})
 				}
 			}
@@ -158,10 +164,15 @@ function createWindow() {
 	})
 
 	try {
-		system.emit('skeleton-info', 'configDir', app.getPath('appData'))
+		let configDir = app.getPath('appData')
+		if (process.env.COMPANION_CONFIG_BASEDIR !== undefined) {
+			configDir = process.env.COMPANION_CONFIG_BASEDIR
+		}
+
+		system.emit('skeleton-info', 'configDir', configDir)
 
 		configureScope(function (scope) {
-			var machidFile = app.getPath('appData') + '/companion/machid'
+			var machidFile = path.join(configDir, '/companion/machid')
 			var machid = fs.readFileSync(machidFile).toString().trim()
 			scope.setUser({ id: machid })
 			scope.setExtra('build', skeleton_info.appBuild)
@@ -215,13 +226,13 @@ function launchUI() {
 	var isMac = process.platform == 'darwin'
 	var isLinux = process.platform == 'linux'
 
-	if (skeleton_info.appURL.match(/http/)) {
+	if (skeleton_info.appLaunch.match(/http/)) {
 		if (isWin) {
-			exec('start ' + skeleton_info.appURL, function callback(error, stdout, stderr) {})
+			exec('start ' + skeleton_info.appLaunch, function callback(error, stdout, stderr) {})
 		} else if (isMac) {
-			exec('open ' + skeleton_info.appURL, function callback(error, stdout, stderr) {})
+			exec('open ' + skeleton_info.appLaunch, function callback(error, stdout, stderr) {})
 		} else if (isLinux) {
-			exec('xdg-open ' + skeleton_info.appURL, function callback(error, stdout, stderr) {})
+			exec('xdg-open ' + skeleton_info.appLaunch, function callback(error, stdout, stderr) {})
 		}
 	}
 }

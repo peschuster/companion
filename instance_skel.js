@@ -19,6 +19,7 @@ var util = require('util')
 var debug = require('debug')('lib/instance_skel')
 var image = require('./lib/image')
 var icons = require('./lib/resources/icons')
+var { serializeIsVisibleFn } = require('./lib/resources/util')
 
 function instance(system, id, config) {
 	var self = this
@@ -36,8 +37,6 @@ function instance(system, id, config) {
 	system.emit('instance_get_package_info', function (obj) {
 		self.package_info = obj[self.config.instance_type]
 	})
-
-	self._versionscripts = []
 
 	for (var key in icons) {
 		self.defineConst(key, icons[key])
@@ -120,73 +119,11 @@ instance.prototype._init = function () {
 instance.prototype.status = function (level, message) {
 	var self = this
 
-	self.currentStatus = level
-	self.currentStatusMessage = message
-	self.system.emit('instance_status_update', self.id, level, message)
-}
-
-instance.prototype.upgradeConfig = function () {
-	var self = this
-
-	var idx = self.config._configIdx
-	if (idx === undefined) {
-		idx = -1
+	if (self.currentStatus != level || self.currentStatusMessage != message) {
+		self.currentStatus = level
+		self.currentStatusMessage = message
+		self.system.emit('instance_status_update', self.id, level, message)
 	}
-
-	var debug = require('debug')('instance:' + self.package_info.name + ':' + self.id)
-
-	if (idx + 1 < self._versionscripts.length) {
-		debug('upgradeConfig(' + self.package_info.name + '): ' + (idx + 1) + ' to ' + self._versionscripts.length)
-	}
-
-	for (var i = idx + 1; i < self._versionscripts.length; ++i) {
-		debug('UpgradeConfig: Upgrading to version ' + (i + 1))
-
-		// Fetch instance actions
-		var actions = []
-		self.system.emit('actions_for_instance', self.id, function (_actions) {
-			actions = _actions
-		})
-		var release_actions = []
-		self.system.emit('release_actions_for_instance', self.id, function (_release_actions) {
-			release_actions = _release_actions
-		})
-		var feedbacks = []
-		self.system.emit('feedbacks_for_instance', self.id, function (_feedbacks) {
-			feedbacks = _feedbacks
-		})
-
-		var result
-		try {
-			result = self._versionscripts[i](self.config, actions, release_actions, feedbacks)
-		} catch (e) {
-			debug('Upgradescript in ' + self.package_info.name + ' failed', e)
-		}
-		self.config._configIdx = i
-
-		for (const action of [...actions, release_actions]) {
-			action.instance = self.id
-			action.label = `${self.id}:${action.action}`
-		}
-
-		// If anything was changed, update system and db
-		if (result) {
-			self.system.emit('config_save')
-			self.system.emit('action_save')
-			self.system.emit('release_action_save')
-			self.system.emit('feedback_save')
-			self.system.emit('instance_save')
-			self.system.emit('db_save')
-		}
-	}
-
-	if (idx + 1 < self._versionscripts.length) {
-		// Save the _configIdx change
-		this.saveConfig()
-	}
-
-	debug('instance save')
-	self.system.emit('instance_save')
 }
 
 instance.prototype.saveConfig = function () {
@@ -196,10 +133,49 @@ instance.prototype.saveConfig = function () {
 	self.system.emit('instance_config_put', self.id, self.config, true)
 }
 
-instance.prototype.addUpgradeScript = function (cb) {
+instance.CreateConvertToBooleanFeedbackUpgradeScript = function (upgrade_map) {
+	// Warning: the unused parameters will often be null
+	return function (_context, _config, _actions, feedbacks) {
+		let changed = false
+
+		for (const feedback of feedbacks) {
+			let upgrade_rules = upgrade_map[feedback.type]
+			if (upgrade_rules === true) {
+				// These are some automated built in rules. They can help make it easier to migrate
+				upgrade_rules = {
+					bg: 'bgcolor',
+					bgcolor: 'bgcolor',
+					fg: 'color',
+					color: 'color',
+					png64: 'png64',
+					png: 'png64',
+				}
+			}
+
+			if (upgrade_rules) {
+				if (!feedback.style) feedback.style = {}
+
+				for (const [option_key, style_key] of Object.entries(upgrade_rules)) {
+					if (feedback.options[option_key] !== undefined) {
+						feedback.style[style_key] = feedback.options[option_key]
+						delete feedback.options[option_key]
+						changed = true
+					}
+				}
+			}
+		}
+
+		return changed
+	}
+}
+
+/** @deprecated implement the static GetUpgradeScripts instead */
+instance.prototype.addUpgradeScript = function () {
 	var self = this
 
-	self._versionscripts.push(cb)
+	throw new Error(
+		'addUpgradeScript has been removed and replaced by a new static GetUpgradeScripts flow. Check the wiki for more information'
+	)
 }
 
 instance.prototype.setActions = function (actions) {
@@ -208,6 +184,15 @@ instance.prototype.setActions = function (actions) {
 	if (actions === undefined) {
 		self._actionDefinitions = {}
 	} else {
+		actions = Object.fromEntries(
+			Object.entries(actions).map(([id, action]) => {
+				if (action && action.options) {
+					action.options = serializeIsVisibleFn(action.options)
+				}
+				return [id, action]
+			})
+		)
+
 		self._actionDefinitions = actions
 	}
 
@@ -224,6 +209,14 @@ instance.prototype.setVariable = function (variable, value) {
 	var self = this
 
 	self.system.emit('variable_instance_set', self, variable, value)
+}
+
+instance.prototype.setVariables = function (variables) {
+	var self = this
+
+	if (typeof variables === 'object') {
+		self.system.emit('variable_instance_set_many', self, variables)
+	}
 }
 
 instance.prototype.getVariable = function (variable, cb) {
@@ -244,6 +237,15 @@ instance.prototype.setFeedbackDefinitions = function (feedbacks) {
 	if (feedbacks === undefined) {
 		self._feedbackDefinitions = {}
 	} else {
+		feedbacks = Object.fromEntries(
+			Object.entries(feedbacks).map(([id, feedback]) => {
+				if (feedback && feedback.options) {
+					feedback.options = serializeIsVisibleFn(feedback.options)
+				}
+				return [id, feedback]
+			})
+		)
+
 		self._feedbackDefinitions = feedbacks
 	}
 
@@ -253,9 +255,17 @@ instance.prototype.setFeedbackDefinitions = function (feedbacks) {
 instance.prototype.setPresetDefinitions = function (presets) {
 	var self = this
 
-	// Because RegExp.escape did not become a standard somehow
-	function escape(str) {
-		return str.replace(/[-[\]{}()*+?.,\\/^$|#\s]/g, '\\$&')
+	const variableRegex = /\$\(([^:)]+):([^)]+)\)/g
+	function replaceAllVariables(fixtext) {
+		if (fixtext && fixtext.includes('$(')) {
+			let matches
+			while ((matches = variableRegex.exec(fixtext)) !== null) {
+				if (matches[2] !== undefined) {
+					fixtext = fixtext.replace(matches[0], '$(' + self.label + ':' + matches[2] + ')')
+				}
+			}
+		}
+		return fixtext
 	}
 
 	/*
@@ -263,21 +273,15 @@ instance.prototype.setPresetDefinitions = function (presets) {
 	 * since the name of the instance is dynamic. We don't want to
 	 * demand that your presets MUST be dynamically generated.
 	 */
-	for (var i = 0; i < presets.length; ++i) {
-		var bank = presets[i].bank
-		var fixtext = bank.text
-		if (bank !== undefined && fixtext !== undefined) {
-			if (fixtext.match(/\$\(/)) {
-				var matches,
-					reg = /\$\(([^:)]+):([^)]+)\)/g
+	for (let preset of presets) {
+		if (preset.bank) {
+			preset.bank.text = replaceAllVariables(preset.bank.text)
+		}
 
-				while ((matches = reg.exec(fixtext)) !== null) {
-					if (matches[1] !== undefined) {
-						if (matches[2] !== undefined) {
-							reg2 = new RegExp('\\$\\(' + escape(matches[1]) + ':' + escape(matches[2]) + '\\)')
-							bank.text = bank.text.replace(reg2, '$(' + self.label + ':' + matches[2] + ')')
-						}
-					}
+		if (preset.feedbacks) {
+			for (const feedback of preset.feedbacks) {
+				if (feedback.style && feedback.style.text) {
+					feedback.style.text = replaceAllVariables(feedback.style.text)
 				}
 			}
 		}
@@ -286,10 +290,18 @@ instance.prototype.setPresetDefinitions = function (presets) {
 	self.system.emit('preset_instance_definitions_set', self, presets)
 }
 
-instance.prototype.checkFeedbacks = function (type) {
+instance.prototype.checkFeedbacks = function (...types) {
 	var self = this
 
-	self.system.emit('feedback_instance_check', self, type)
+	self.system.emit('feedback_check_all', { instance_id: self.id, feedback_types: types })
+}
+
+instance.prototype.checkFeedbacksById = function (...ids) {
+	var self = this
+
+	if (ids && ids.length > 0) {
+		self.system.emit('feedback_check_all', { instance_id: self.id, feedback_ids: ids })
+	}
 }
 
 instance.prototype.getAllFeedbacks = function () {
@@ -314,7 +326,13 @@ instance.prototype.subscribeFeedbacks = function (type) {
 				continue
 			}
 
-			self.subscribeFeedback(feedback)
+			if (feedback.type !== undefined && self._feedbackDefinitions[feedback.type] !== undefined) {
+				let definition = self._feedbackDefinitions[feedback.type]
+				// Run the subscribe function if needed
+				if (definition.subscribe !== undefined && typeof definition.subscribe == 'function') {
+					definition.subscribe(feedback)
+				}
+			}
 		}
 	}
 }
@@ -331,31 +349,13 @@ instance.prototype.unsubscribeFeedbacks = function (type) {
 				continue
 			}
 
-			self.unsubscribeFeedback(feedback)
-		}
-	}
-}
-
-instance.prototype.subscribeFeedback = function (feedback) {
-	var self = this
-
-	if (feedback.type !== undefined && self._feedbackDefinitions[feedback.type] !== undefined) {
-		let definition = self._feedbackDefinitions[feedback.type]
-		// Run the subscribe function if needed
-		if (definition.subscribe !== undefined && typeof definition.subscribe == 'function') {
-			definition.subscribe(feedback)
-		}
-	}
-}
-
-instance.prototype.unsubscribeFeedback = function (feedback) {
-	var self = this
-
-	if (feedback.type !== undefined && self._feedbackDefinitions[feedback.type] !== undefined) {
-		let definition = self._feedbackDefinitions[feedback.type]
-		// Run the unsubscribe function if needed
-		if (definition.unsubscribe !== undefined && typeof definition.unsubscribe == 'function') {
-			definition.unsubscribe(feedback)
+			if (feedback.type !== undefined && self._feedbackDefinitions[feedback.type] !== undefined) {
+				let definition = self._feedbackDefinitions[feedback.type]
+				// Run the unsubscribe function if needed
+				if (definition.unsubscribe !== undefined && typeof definition.unsubscribe == 'function') {
+					definition.unsubscribe(feedback)
+				}
+			}
 		}
 	}
 }
@@ -385,7 +385,13 @@ instance.prototype.subscribeActions = function (type) {
 				continue
 			}
 
-			self.subscribeAction(action)
+			if (action.action !== undefined && self._actionDefinitions[action.action] !== undefined) {
+				let definition = self._actionDefinitions[action.action]
+				// Run the subscribe function if needed
+				if (definition.subscribe !== undefined && typeof definition.subscribe == 'function') {
+					definition.subscribe(action)
+				}
+			}
 		}
 	}
 }
@@ -402,33 +408,20 @@ instance.prototype.unsubscribeActions = function (type) {
 				continue
 			}
 
-			self.unsubscribeAction(action)
+			if (action.action !== undefined && self._actionDefinitions[action.action] !== undefined) {
+				let definition = self._actionDefinitions[action.action]
+				// Run the unsubscribe function if needed
+				if (definition.unsubscribe !== undefined && typeof definition.unsubscribe == 'function') {
+					definition.unsubscribe(action)
+				}
+			}
 		}
 	}
 }
 
-instance.prototype.subscribeAction = function (action) {
+instance.prototype.oscSend = function (host, port, path, args) {
 	var self = this
-
-	if (action.action !== undefined && self._actionDefinitions[action.action] !== undefined) {
-		let definition = self._actionDefinitions[action.action]
-		// Run the subscribe function if needed
-		if (definition.subscribe !== undefined && typeof definition.subscribe == 'function') {
-			definition.subscribe(action)
-		}
-	}
-}
-
-instance.prototype.unsubscribeAction = function (action) {
-	var self = this
-
-	if (action.action !== undefined && self._actionDefinitions[action.action] !== undefined) {
-		let definition = self._actionDefinitions[action.action]
-		// Run the unsubscribe function if needed
-		if (definition.unsubscribe !== undefined && typeof definition.unsubscribe == 'function') {
-			definition.unsubscribe(action)
-		}
-	}
+	self.system.emit('osc_send', host, port, path, args)
 }
 
 instance.extendedBy = function (module) {
