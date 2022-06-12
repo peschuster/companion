@@ -10,6 +10,8 @@ var exec = require('child_process').exec
 const { init, showReportDialog, configureScope } = require('@sentry/electron')
 const systeminformation = require('systeminformation')
 
+let configDir
+
 // Ensure there isn't another instance of companion running already
 var lock = app.requestSingleInstanceLock()
 if (!lock) {
@@ -27,10 +29,20 @@ system.emit('skeleton-info-info', function (info) {
 	skeleton_info = info
 })
 
-if (process.env.DEVELOPER === undefined) {
+let sentryDsn
+try {
+	sentryDsn = fs
+		.readFileSync(__dirname + '/SENTRY')
+		.toString()
+		.trim()
+} catch (e) {
+	console.log('Sentry DSN not located')
+}
+
+if (process.env.DEVELOPER === undefined && sentryDsn && sentryDsn.substring(0, 8) == 'https://') {
 	console.log('Configuring sentry error reporting')
 	init({
-		dsn: 'https://535745b2e446442ab024d1c93a349154@sentry.bitfocus.io/8',
+		dsn: sentryDsn,
 		release: `companion@${skeleton_info.appBuild || skeleton_info.appVersion}`,
 		beforeSend(event) {
 			if (event.exception) {
@@ -164,7 +176,7 @@ function createWindow() {
 	})
 
 	try {
-		let configDir = app.getPath('appData')
+		configDir = app.getPath('appData')
 		if (process.env.COMPANION_CONFIG_BASEDIR !== undefined) {
 			configDir = process.env.COMPANION_CONFIG_BASEDIR
 		}
@@ -214,6 +226,12 @@ function createTray() {
 	)
 	menu.append(
 		new electron.MenuItem({
+			label: 'Show config folder',
+			click: showConfigFolder,
+		})
+	)
+	menu.append(
+		new electron.MenuItem({
 			label: 'Quit',
 			click: trayQuit,
 		})
@@ -253,6 +271,14 @@ function trayQuit() {
 
 function scanUsb() {
 	system.emit('devices_reenumerate')
+}
+
+function showConfigFolder() {
+	try {
+		electron.shell.showItemInFolder(path.join(configDir, 'companion', 'db'))
+	} catch (e) {
+		electron.dialog.showErrorBox('File Error', 'Could not open config directory.')
+	}
 }
 
 function toggleWindow() {

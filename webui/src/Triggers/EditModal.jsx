@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useMemo, useState } from 'react'
+import React, { useCallback, useContext, useMemo, useRef, useState } from 'react'
 import {
 	CButton,
 	CCol,
@@ -18,6 +18,7 @@ import { AddFeedbackDropdown, FeedbackEditor } from '../Buttons/EditButton/Feedb
 import shortid from 'shortid'
 import { ActionsPanelInner } from '../Buttons/EditButton/ActionsPanel'
 import { CheckboxInputField } from '../Components'
+import { AddFeedbacksModal } from '../Buttons/EditButton/AddModal'
 
 function getPluginSpecDefaults(pluginOptions) {
 	const config = {}
@@ -187,6 +188,7 @@ export function TriggerEditModal({ doClose, doSave, item, plugins }) {
 						</CCol>
 					</CRow>
 					<ActionsPanelInner
+						isOnBank={false}
 						dragId={'triggerAction'}
 						addPlaceholder="+ Add action"
 						actions={config.actions || []}
@@ -209,6 +211,15 @@ export function TriggerEditModal({ doClose, doSave, item, plugins }) {
 
 function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 	const context = useContext(StaticContext)
+
+	const addFeedbacksRef = useRef(null)
+	const showAddModal = useCallback(() => {
+		if (addFeedbacksRef.current) {
+			addFeedbacksRef.current.show()
+		}
+	}, [])
+
+	if (pluginSpec.type === 'feedback' && !Array.isArray(config)) config = [config]
 
 	const updateInnerConfig = useCallback(
 		(id, val) => {
@@ -235,8 +246,29 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 		[config, updateConfig]
 	)
 
+	const [recentFeedbacks, setRecentFeedbacks] = useState([])
+	useMountEffect(() => {
+		try {
+			// Load from localStorage at startup
+			const recent = JSON.parse(window.localStorage.getItem('recent_feedbacks') || '[]')
+			if (Array.isArray(recent)) {
+				setRecentFeedbacks(recent)
+			}
+		} catch (e) {
+			setRecentFeedbacks([])
+		}
+	})
+
 	const addFeedbackSelect = useCallback(
 		(feedbackType) => {
+			setRecentFeedbacks((existing) => {
+				const newActions = [feedbackType, ...existing.filter((v) => v !== feedbackType)].slice(0, 20)
+
+				window.localStorage.setItem('recent_feedbacks', JSON.stringify(newActions))
+
+				return newActions
+			})
+
 			socketEmit(context.socket, 'feedback_get_defaults', [feedbackType]).then(([fb]) => {
 				updateConfig('config', [...config, fb])
 			})
@@ -252,16 +284,16 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 
 	// This is a bit of a hack:
 	if (pluginSpec.type === 'feedback') {
-		const config2 = Array.isArray(config) ? config : [config]
 		return (
 			<>
 				<table className="table feedback-table">
 					<tbody>
-						{config2.map((conf, i) => (
+						{config.map((conf, i) => (
 							<tr key={i}>
 								<td>
 									<MyErrorBoundary>
 										<FeedbackEditor
+											isOnBank={false}
 											feedback={conf}
 											setValue={(id, k, v) => updateFeedbackOptionConfig(i, k, v)}
 											innerDelete={() => delRow(i)}
@@ -273,7 +305,14 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 					</tbody>
 				</table>
 
-				<AddFeedbackDropdown onSelect={addFeedbackSelect} booleanOnly />
+				<AddFeedbacksModal ref={addFeedbacksRef} addFeedback={addFeedbackSelect} />
+
+				<div className="add-dropdown-wrapper">
+					<AddFeedbackDropdown onSelect={addFeedbackSelect} booleanOnly recentFeedbacks={recentFeedbacks} />
+					<CButton color="primary" variant="outline" onClick={showAddModal}>
+						Browse
+					</CButton>
+				</div>
 			</>
 		)
 	}

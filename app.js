@@ -25,6 +25,7 @@ global.MAX_BUTTONS_PER_ROW = 8
 var EventEmitter = require('events')
 var system = new EventEmitter()
 var fs = require('fs')
+var path = require('path')
 var debug = require('debug')('app')
 var mkdirp = require('mkdirp')
 var stripAnsi = require('strip-ansi')
@@ -40,14 +41,15 @@ try {
 		.trim()
 } catch (e) {
 	console.error('Companion cannot start as the "BUILD" file is missing')
-	console.error('If you are running from source, you can generate it by running: ./tools/build_writefile.sh')
+	console.error('If you are running from source, you can generate it by running: yarn build:writefile')
 	process.exit(1)
 }
 
 const skeleton_info = {
 	appName: pkgInfo.description,
 	appVersion: pkgInfo.version,
-	appBuild: buildNumber.replace(/-*master-*/, '').replace(/^-/, ''),
+	appBuild: buildNumber.replace(/-*master/, '').replace(/^-/, ''),
+	appLaunch: '',
 	appStatus: 'Starting',
 }
 
@@ -137,7 +139,7 @@ system.ready = function (logToFile) {
 				var writestring = logbuffer.join('\n')
 				logbuffer = []
 				logwriting = true
-				fs.appendFile('./companion.log', writestring + '\n', function (err) {
+				fs.appendFile(path.join(cfgDir, 'companion.log'), writestring + '\n', function (err) {
 					if (err) {
 						console.log('log write error', err)
 					}
@@ -188,7 +190,6 @@ system.ready = function (logToFile) {
 	var satelliteLegacy = require('./lib/satellite/satellite_server_legacy')(system)
 	var satellite = require('./lib/satellite/satellite_server')(system)
 	var elgato_plugin_server = require('./lib/elgato_plugin_server')(system)
-	var help = require('./lib/help')(system)
 	var metrics = require('./lib/metrics')(system)
 
 	system.emit('modules_loaded')
@@ -196,6 +197,10 @@ system.ready = function (logToFile) {
 	system.on('exit', function () {
 		elgatoDM.quit()
 	})
+
+	setTimeout(function () {
+		system.emit('ip_rebind')
+	}, 2000)
 }
 
 exports = module.exports = system
