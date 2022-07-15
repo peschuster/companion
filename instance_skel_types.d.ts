@@ -3,7 +3,7 @@ import { EventEmitter } from 'events'
 
 export interface CompanionSystem extends EventEmitter {}
 
-export type InputValue = number | string | boolean
+export type InputValue = number | string | boolean | Array<string | number>
 
 export type CompanionBank = CompanionBankPage | CompanionBankPNG | CompanionBankPreset
 
@@ -111,7 +111,7 @@ export interface CompanionInputField {
 	type: 'text' | 'textinput' | 'textwithvariables' | 'dropdown' | 'colorpicker' | 'number' | 'checkbox'
 	label: string
 	tooltip?: string
-	isVisible?: (options: { [key: string]: InputValue | undefined }) => boolean
+	isVisible?: (options: any /*CompanionActionEvent | CompanionFeedbackEvent*/) => boolean // TODO - this varies based on where it is used, and in this current structure is not possible to type without breaking every module
 }
 export interface CompanionInputFieldText extends CompanionInputField {
 	type: 'text'
