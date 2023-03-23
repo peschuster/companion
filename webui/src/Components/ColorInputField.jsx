@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
-import { SketchPicker } from 'react-color'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { SketchPicker } from '@hello-pangea/color-picker'
+import { createPortal } from 'react-dom'
+import { useOnClickOutsideExt } from '../util'
+import { usePopper } from 'react-popper'
+import { MenuPortalContext } from './DropdownInputField'
 
 function splitColors(number) {
 	return {
@@ -10,6 +14,8 @@ function splitColors(number) {
 }
 
 export function ColorInputField({ definition, value, setValue, setValid }) {
+	const menuPortal = useContext(MenuPortalContext)
+
 	const [currentColor, setCurrentColor] = useState(null)
 	const [displayPicker, setDisplayPicker] = useState(false)
 
@@ -21,7 +27,15 @@ export function ColorInputField({ definition, value, setValue, setValid }) {
 		setValid?.(true)
 	}, [definition.default, value, setValue, setValid])
 
-	const handleClick = useCallback(() => setDisplayPicker((d) => !d), [])
+	const handleClick = useCallback((e) => setDisplayPicker((d) => !d), [])
+	const setHide = useCallback((e) => {
+		if (e) {
+			e.preventDefault()
+			e.stopPropagation()
+		}
+
+		setDisplayPicker(false)
+	}, [])
 
 	const onChange = useCallback(
 		(c) => {
@@ -62,20 +76,21 @@ export function ColorInputField({ definition, value, setValue, setValid }) {
 			display: 'inline-block',
 			cursor: 'pointer',
 		},
-		popover: {
-			position: 'absolute',
-			zIndex: '2',
-		},
 	}
+
+	const [referenceElement, setReferenceElement] = useState(null)
+	const [popperElement, setPopperElement] = useState(null)
+	const { styles: popperStyles, attributes } = usePopper(referenceElement, popperElement)
+	useOnClickOutsideExt([{ current: referenceElement }, { current: popperElement }], setHide)
 
 	return (
 		<div style={{ lineHeight: 0 }}>
-			<div style={styles.swatch} onClick={handleClick}>
+			<div style={styles.swatch} onClick={handleClick} ref={setReferenceElement}>
 				<div style={styles.color} />
 			</div>
-			{displayPicker ? (
-				<>
-					<div style={styles.popover}>
+			{displayPicker &&
+				createPortal(
+					<div ref={setPopperElement} style={popperStyles.popper} {...attributes.popper}>
 						<SketchPicker
 							color={color}
 							onChange={onChange}
@@ -83,15 +98,9 @@ export function ColorInputField({ definition, value, setValue, setValid }) {
 							disableAlpha={true}
 							presetColors={PICKER_COLORS}
 						/>
-					</div>
-					<div style={{ position: 'absolute' }}>
-						<div
-							style={{ position: 'fixed', top: '0', right: '0', bottom: '0', left: '0' }}
-							onClick={handleClick}
-						></div>
-					</div>
-				</>
-			) : null}
+					</div>,
+					menuPortal || document.body
+				)}
 		</div>
 	)
 }

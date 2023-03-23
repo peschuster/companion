@@ -18,6 +18,7 @@ import { ActionTableRowOption } from './Table'
 import { useDrag, useDrop } from 'react-dnd'
 import { GenericConfirmModal } from '../../Components/GenericConfirmModal'
 import { AddActionsModal } from './AddModal'
+import { MenuPortalContext } from '../../Components/DropdownInputField'
 
 export function ActionsPanel({
 	page,
@@ -29,6 +30,7 @@ export function ActionsPanel({
 	orderCommand,
 	setDelay,
 	deleteCommand,
+	learnCommand,
 	addPlaceholder,
 	setLoadStatus,
 	loadStatusKey,
@@ -52,7 +54,31 @@ export function ActionsPanel({
 				setLoadStatus(loadStatusKey, `Failed to load ${loadStatusKey}`)
 				console.error('Failed to load bank actions', e)
 			})
-	}, [context.socket, getCommand, setLoadStatus, loadStatusKey, page, bank, reloadToken])
+
+		const learnHandler = (actionId, actionOptions) => {
+			if (actionId && actionOptions) {
+				setActions((oldActions) => {
+					const index = oldActions.findIndex((a) => a.id === actionId)
+					if (index === -1) {
+						return oldActions
+					} else {
+						const newActions = [...oldActions]
+						newActions[index] = {
+							...newActions[index],
+							options: actionOptions,
+						}
+						return newActions
+					}
+				})
+			}
+		}
+
+		context.socket.on(`${learnCommand}:result`, learnHandler)
+
+		return () => {
+			context.socket.off(`${learnCommand}:result`, learnHandler)
+		}
+	}, [context.socket, getCommand, setLoadStatus, loadStatusKey, page, bank, reloadToken, learnCommand])
 
 	const emitUpdateOption = useCallback(
 		(actionId, key, val) => {
@@ -72,6 +98,13 @@ export function ActionsPanel({
 			context.socket.emit(deleteCommand, page, bank, actionId)
 		},
 		[context.socket, deleteCommand, page, bank]
+	)
+
+	const emitLearn = useCallback(
+		(actionId) => {
+			context.socket.emit(learnCommand, page, bank, actionId)
+		},
+		[context.socket, learnCommand, page, bank]
 	)
 
 	const emitOrder = useCallback(
@@ -108,6 +141,7 @@ export function ActionsPanel({
 				emitSetDelay={emitSetDelay}
 				emitDelete={emitDelete}
 				emitOrder={emitOrder}
+				emitLearn={emitLearn}
 				addAction={addAction}
 			/>
 		</>
@@ -125,6 +159,7 @@ export function ActionsPanelInner({
 	emitSetDelay,
 	emitDelete,
 	emitOrder,
+	emitLearn,
 	addAction,
 }) {
 	const addActionsRef = useRef(null)
@@ -270,6 +305,7 @@ export function ActionsPanelInner({
 							doDelete={doDelete}
 							doDelay={doDelay}
 							moveCard={moveCard}
+							doLearn={emitLearn}
 						/>
 					))}
 				</tbody>
@@ -285,12 +321,13 @@ export function ActionsPanelInner({
 	)
 }
 
-function ActionTableRow({ action, isOnBank, index, dragId, setValue, doDelete, doDelay, moveCard }) {
+function ActionTableRow({ action, isOnBank, index, dragId, setValue, doDelete, doDelay, moveCard, doLearn }) {
 	const instancesContext = useContext(InstancesContext)
 	const actionsContext = useContext(ActionsContext)
 
 	const innerDelete = useCallback(() => doDelete(action.id), [action.id, doDelete])
 	const innerDelay = useCallback((delay) => doDelay(action.id, delay), [doDelay, action.id])
+	const innerLearn = useCallback(() => doLearn(action.id), [doLearn, action.id])
 
 	const [optionVisibility, setOptionVisibility] = useState({})
 
@@ -403,8 +440,7 @@ function ActionTableRow({ action, isOnBank, index, dragId, setValue, doDelete, d
 	if (actionSpec) {
 		name = `${instanceLabel}: ${actionSpec.label}`
 	} else {
-		const actionId = action.label.split(/:/)[1]
-		name = `${instanceLabel}: ${actionId} (undefined)`
+		name = `${instanceLabel}: ${action.action} (undefined)`
 	}
 
 	return (
@@ -434,6 +470,14 @@ function ActionTableRow({ action, isOnBank, index, dragId, setValue, doDelete, d
 						<CButton color="danger" size="sm" onClick={innerDelete} title="Remove action">
 							<FontAwesomeIcon icon={faTrash} />
 						</CButton>
+						&nbsp;
+						{actionSpec?.hasLearn ? (
+							<CButton color="info" size="sm" onClick={innerLearn} title="Capture the current values from the device">
+								Learn
+							</CButton>
+						) : (
+							''
+						)}
 					</div>
 
 					<div className="cell-option">
@@ -478,6 +522,7 @@ const noOptionsMessage = ({ inputValue }) => {
 }
 
 function AddActionDropdown({ onSelect, placeholder, recentActions }) {
+	const menuPortal = useContext(MenuPortalContext)
 	const instancesContext = useContext(InstancesContext)
 	const actionsContext = useContext(ActionsContext)
 
@@ -496,15 +541,17 @@ function AddActionDropdown({ onSelect, placeholder, recentActions }) {
 
 		const recents = []
 		for (const actionType of recentActions) {
-			const [instanceId, actionId] = actionType.split(':', 2)
-			const actionInfo = actionsContext[instanceId]?.[actionId]
-			if (actionInfo) {
-				const instanceLabel = instancesContext[instanceId]?.label ?? instanceId
-				recents.push({
-					isRecent: true,
-					value: `${instanceId}:${actionId}`,
-					label: `${instanceLabel}: ${actionInfo.label}`,
-				})
+			if (actionType) {
+				const [instanceId, actionId] = actionType.split(':', 2)
+				const actionInfo = actionsContext[instanceId]?.[actionId]
+				if (actionInfo) {
+					const instanceLabel = instancesContext[instanceId]?.label ?? instanceId
+					recents.push({
+						isRecent: true,
+						value: `${instanceId}:${actionId}`,
+						label: `${instanceLabel}: ${actionInfo.label}`,
+					})
+				}
 			}
 		}
 		options.push({
@@ -526,6 +573,11 @@ function AddActionDropdown({ onSelect, placeholder, recentActions }) {
 
 	return (
 		<Select
+			menuShouldBlockScroll={!!menuPortal} // The dropdown doesn't follow scroll when in a modal
+			menuPortalTarget={menuPortal || document.body}
+			menuPosition={'fixed'}
+			classNamePrefix="select-control"
+			menuPlacement="auto"
 			isClearable={false}
 			isSearchable={true}
 			isMulti={false}

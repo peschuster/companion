@@ -153,7 +153,7 @@ function InstancesTableRow({
 				)}
 			</td>
 			<td>
-				{instanceVariables && instanceVariables.length > 0 ? (
+				{instanceVariables && Object.keys(instanceVariables).length > 0 ? (
 					<div className="instance_variables" onClick={doShowVariables} title="Variables">
 						<FontAwesomeIcon icon={faDollarSign} />
 					</div>
@@ -163,7 +163,7 @@ function InstancesTableRow({
 				{instance.label}
 			</td>
 			<td className={status.className} title={status.title}>
-				{status.text}
+				{typeof status.text === 'string' ? status.text : JSON.stringify(status.text)}
 			</td>
 			<td className="action-buttons">
 				<CButton onClick={doDelete} variant="ghost" color="danger" size="sm">

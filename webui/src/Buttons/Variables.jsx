@@ -12,6 +12,7 @@ import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCopy, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { TextInputField } from '../Components/TextInputField'
+import { CheckboxInputField } from '../Components/CheckboxInputField'
 import { GenericConfirmModal } from '../Components/GenericConfirmModal'
 
 export const InstanceVariables = function InstanceVariables({ resetToken }) {
@@ -56,7 +57,7 @@ function VariablesInstanceList({ setInstance, setShowCustom, instancesLabelMap }
 	const variableDefinitionsContext = useContext(VariableDefinitionsContext)
 
 	const options = Object.entries(variableDefinitionsContext || []).map(([label, defs]) => {
-		if (!defs || defs.length === 0) return ''
+		if (!defs || Object.keys(defs).length === 0) return ''
 
 		const id = instancesLabelMap.get(label)
 		const instance = id ? instancesContext[id] : undefined
@@ -180,6 +181,19 @@ function CustomVariablesList({ setShowCustom }) {
 		[context.socket]
 	)
 
+	const setPersistenceValue = useCallback(
+		(name, value) => {
+			socketEmit(context.socket, 'custom_variables_update_persistent', [name, value])
+				.then(([res]) => {
+					// TODO
+				})
+				.catch((e) => {
+					console.error('Failed to update variable')
+				})
+		},
+		[context.socket]
+	)
+
 	const confirmRef = useRef(null)
 	const doDelete = useCallback(
 		(name) => {
@@ -235,9 +249,18 @@ function CustomVariablesList({ setShowCustom }) {
 											/>
 										</CFormGroup>
 										<CFormGroup>
+											<CLabel htmlFor="persist_value">Persist value: </CLabel>
+											<CheckboxInputField
+												definition={{ default: false }}
+												value={info.persistCurrentValue}
+												setValue={(val) => setPersistenceValue(name, val)}
+											/>
+										</CFormGroup>
+										<CFormGroup>
 											<CLabel htmlFor="startup_value">Startup value: </CLabel>
 											<TextInputField
 												definition={{}}
+												readonly={!!info.persistCurrentValue}
 												value={info.defaultValue}
 												setValue={(val) => setStartupValue(name, val)}
 											/>

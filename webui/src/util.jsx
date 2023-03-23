@@ -4,6 +4,9 @@ import { CAlert, CButton, CCol } from '@coreui/react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { PRIMARY_COLOR } from './Constants'
 import { BarLoader } from 'react-spinners'
+import { applyPatch } from 'fast-json-patch'
+import { cloneDeep } from 'lodash-es'
+import { useEventListener } from 'usehooks-ts'
 
 export const SERVER_URL = window.SERVER_URL === '%REACT_APP_SERVER_URL%' ? undefined : window.SERVER_URL
 
@@ -176,4 +179,54 @@ export function LoadingRetryOrError({ error, dataReady, doRetry }) {
 			)}
 		</>
 	)
+}
+
+export function myApplyPatch(oldDefinitions, key, patch, defVal = {}) {
+	if (oldDefinitions) {
+		const oldEntry = oldDefinitions[key] ?? defVal
+
+		const newDefinitions = { ...oldDefinitions }
+		if (!patch) {
+			delete newDefinitions[key]
+		} else if (Array.isArray(patch)) {
+			// If its an array we assume it is a patch
+			newDefinitions[key] = applyPatch(cloneDeep(oldEntry), patch).newDocument
+		} else {
+			// If its any other type, then its not a patch and is likely a complete value
+			newDefinitions[key] = patch
+		}
+
+		return newDefinitions
+	} else {
+		return oldDefinitions
+	}
+}
+export function myApplyPatch2(oldObj, patch) {
+	const oldEntry = oldObj ?? {}
+
+	if (Array.isArray(patch)) {
+		// If its an array we assume it is a patch
+		return applyPatch(cloneDeep(oldEntry), patch).newDocument
+	} else {
+		// If its any other type, then its not a patch and is likely a complete value
+		return patch
+	}
+}
+
+/**
+ * Slight modification of useClickoutside from usehooks-ts, which expects an array of refs to check
+ */
+export function useOnClickOutsideExt(refs, handler, mouseEvent = 'mousedown') {
+	useEventListener(mouseEvent, (event) => {
+		for (const ref of refs) {
+			const el = ref?.current
+
+			// Do nothing if clicking ref's element or descendent elements
+			if (!el || el.contains(event.target)) {
+				return
+			}
+		}
+
+		handler(event)
+	})
 }

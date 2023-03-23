@@ -19,6 +19,8 @@ import shortid from 'shortid'
 import { ActionsPanelInner } from '../Buttons/EditButton/ActionsPanel'
 import { CheckboxInputField } from '../Components'
 import { AddFeedbacksModal } from '../Buttons/EditButton/AddModal'
+import { useEffect } from 'react'
+import { MenuPortalContext } from '../Components/DropdownInputField'
 
 function getPluginSpecDefaults(pluginOptions) {
 	const config = {}
@@ -58,13 +60,13 @@ function getFeedbackDefaults() {
 export function TriggerEditModal({ doClose, doSave, item, plugins }) {
 	const context = useContext(StaticContext)
 
+	const actionsRef = useRef()
+
 	const [config, setConfig] = useState({})
-	const updateConfig = useCallback((id, val) => {
-		setConfig((oldConfig) => ({
-			...oldConfig,
-			[id]: val,
-		}))
-	}, [])
+
+	useEffect(() => {
+		actionsRef.current = config.actions
+	}, [config.actions])
 
 	const pluginSpec = plugins?.find((p) => p.type === config.type)
 
@@ -103,6 +105,8 @@ export function TriggerEditModal({ doClose, doSave, item, plugins }) {
 			// hack
 			if (!item.actions) item.actions = []
 
+			if (item.type === 'feedback' && !Array.isArray(item.config)) item.config = [item.config]
+
 			setConfig(item)
 		} else if (plugins) {
 			const defaultPlugin = plugins.find((p) => p.type === 'feedback') ?? plugins[0]
@@ -125,92 +129,151 @@ export function TriggerEditModal({ doClose, doSave, item, plugins }) {
 	const addActionSelect = useCallback(
 		(actionType) => {
 			socketEmit(context.socket, 'action_get_defaults', [actionType]).then(([action]) => {
-				updateConfig('actions', [...config.actions, action])
+				setConfig((oldConfig) => ({
+					...oldConfig,
+					actions: [...oldConfig.actions, action],
+				}))
 			})
 		},
-		[context.socket, config, updateConfig]
+		[context.socket]
 	)
 
-	return (
-		<CModal show={true} onClose={doClose} size="lg">
-			<CForm onSubmit={doSaveInner} className={'edit-button-panel'}>
-				<CModalHeader closeButton>
-					<h5>Trigger Editor</h5>
-				</CModalHeader>
-				<CModalBody>
-					<CFormGroup>
-						<label>Name</label>
-						<CInput required value={config.title} onChange={(e) => updateConfig('title', e.target.value)} />
-					</CFormGroup>
-
-					<legend>Condition</legend>
-					<CFormGroup>
-						<label>Type</label>
-						<Select
-							value={pluginChoices.find((c) => c.value === config.type)}
-							onChange={changeType}
-							isSearchable={false}
-							isClearable={false}
-							options={pluginChoices}
-							required
-						/>
-					</CFormGroup>
-
-					{pluginSpec?.options ? (
-						<TriggerEditModalConfig pluginSpec={pluginSpec} config={config.config} updateConfig={updateConfig} />
-					) : (
-						'Unknown type selected'
-					)}
-
-					<hr />
-					<legend>Action</legend>
-					<CRow form className="button-style-form">
-						<CCol className="fieldtype-checkbox" sm={2} xs={3}>
-							<CButton
-								color="warning"
-								onMouseDown={() =>
-									context.socket.emit('schedule_test_actions', config.title, config.actions, config.relative_delays)
+	const doLearn = useCallback(
+		(actionId) => {
+			if (actionsRef.current) {
+				const action = actionsRef.current.find((a) => a.id === actionId)
+				if (action) {
+					socketEmit(context.socket, 'action_learn_single', [action])
+						.then(([newOptions]) => {
+							setActions((oldActions) => {
+								const index = oldActions.findIndex((a) => a.id === actionId)
+								if (index === -1) {
+									return oldActions
+								} else {
+									const newActions = [...oldActions]
+									newActions[index] = {
+										...newActions[index],
+										options: newOptions,
+									}
+									return newActions
 								}
-							>
-								Test actions
-							</CButton>
-						</CCol>
-						<CCol className="fieldtype-checkbox" sm={2} xs={3}>
-							<CLabel>Relative Delays</CLabel>
-							<p>
-								<CheckboxInputField
-									definition={{ default: false }}
-									value={config.relative_delays ?? false}
-									setValue={(e) => updateConfig('relative_delays', e)}
-								/>
-								&nbsp;
-							</p>
-						</CCol>
-					</CRow>
-					<ActionsPanelInner
-						isOnBank={false}
-						dragId={'triggerAction'}
-						addPlaceholder="+ Add action"
-						actions={config.actions || []}
-						setActions={setActions}
-						addAction={addActionSelect}
-					/>
-				</CModalBody>
-				<CModalFooter>
-					<CButton color="secondary" onClick={doClose}>
-						Cancel
-					</CButton>
-					<CButton color="primary" type="submit">
-						Save
-					</CButton>
-				</CModalFooter>
-			</CForm>
+							})
+						})
+						.catch((e) => {
+							console.error('Learn failed', e)
+						})
+				} else {
+					console.error('Not found')
+				}
+			}
+		},
+		[context.socket, setActions]
+	)
+
+	const setTitle = useCallback((e) => {
+		setConfig((oldConfig) => ({
+			...oldConfig,
+			title: e.target.value,
+		}))
+	}, [])
+
+	const setRelativeDelays = useCallback((e) => {
+		setConfig((oldConfig) => ({
+			...oldConfig,
+			relative_delays: e,
+		}))
+	}, [])
+
+	const [modalRef, setModalRef] = useState(null)
+
+	return (
+		<CModal innerRef={setModalRef} show={true} onClose={doClose} size="lg">
+			<MenuPortalContext.Provider value={modalRef}>
+				<CForm onSubmit={doSaveInner} className={'edit-button-panel'}>
+					<CModalHeader closeButton>
+						<h5>Trigger Editor</h5>
+					</CModalHeader>
+					<CModalBody>
+						<CFormGroup>
+							<label>Name</label>
+							<CInput required value={config.title} onChange={setTitle} />
+						</CFormGroup>
+
+						<legend>Condition</legend>
+						<CFormGroup>
+							<label>Type</label>
+							<Select
+								value={pluginChoices.find((c) => c.value === config.type)}
+								onChange={changeType}
+								isSearchable={false}
+								isClearable={false}
+								options={pluginChoices}
+								required
+							/>
+						</CFormGroup>
+
+						{pluginSpec?.options ? (
+							<TriggerEditModalConfig pluginSpec={pluginSpec} config={config.config} setConfig={setConfig} />
+						) : (
+							'Unknown type selected'
+						)}
+
+						<hr />
+						<legend>Action</legend>
+						<CRow form className="button-style-form">
+							<CCol className="fieldtype-checkbox" sm={2} xs={3}>
+								<CButton
+									color="warning"
+									onMouseDown={() =>
+										context.socket.emit('schedule_test_actions', config.title, config.actions, config.relative_delays)
+									}
+								>
+									Test actions
+								</CButton>
+							</CCol>
+							<CCol className="fieldtype-checkbox" sm={2} xs={3}>
+								<CLabel>Relative Delays</CLabel>
+								<p>
+									<CheckboxInputField
+										definition={{ default: false }}
+										value={config.relative_delays ?? false}
+										setValue={setRelativeDelays}
+									/>
+									&nbsp;
+								</p>
+							</CCol>
+						</CRow>
+						<ActionsPanelInner
+							isOnBank={false}
+							dragId={'triggerAction'}
+							addPlaceholder="+ Add action"
+							actions={config.actions || []}
+							setActions={setActions}
+							addAction={addActionSelect}
+							emitLearn={doLearn}
+						/>
+					</CModalBody>
+					<CModalFooter>
+						<CButton color="secondary" onClick={doClose}>
+							Cancel
+						</CButton>
+						<CButton color="primary" type="submit">
+							Save
+						</CButton>
+					</CModalFooter>
+				</CForm>
+			</MenuPortalContext.Provider>
 		</CModal>
 	)
 }
 
-function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
+function TriggerEditModalConfig({ pluginSpec, config, setConfig }) {
 	const context = useContext(StaticContext)
+
+	const feedbacksRef = useRef(null)
+	useEffect(() => {
+		feedbacksRef.current = config
+	}, [config])
 
 	const addFeedbacksRef = useRef(null)
 	const showAddModal = useCallback(() => {
@@ -219,31 +282,41 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 		}
 	}, [])
 
-	if (pluginSpec.type === 'feedback' && !Array.isArray(config)) config = [config]
-
 	const updateInnerConfig = useCallback(
 		(id, val) => {
-			updateConfig('config', {
-				...config,
-				[id]: val,
-			})
-		},
-		[config, updateConfig]
-	)
-	const updateFeedbackOptionConfig = useCallback(
-		(index, id, val) => {
-			const newConfig = [...config]
-			console.log('set', newConfig[index].options, id, val)
-			newConfig[index] = {
-				...newConfig[index],
-				options: {
-					...newConfig[index].options,
+			setConfig((oldConfig) => ({
+				...oldConfig,
+				config: {
+					...oldConfig.config,
 					[id]: val,
 				},
-			}
-			updateConfig('config', newConfig)
+			}))
 		},
-		[config, updateConfig]
+		[setConfig]
+	)
+	const updateFeedbackOptionConfig = useCallback(
+		(feedbackId, id, val) => {
+			setConfig((oldConfig) => {
+				const newFeedbacks = oldConfig.config.map((fb) => {
+					if (fb.id === feedbackId) {
+						return {
+							...fb,
+							options: {
+								...fb.options,
+								[id]: val,
+							},
+						}
+					} else {
+						return fb
+					}
+				})
+				return {
+					...oldConfig,
+					config: newFeedbacks,
+				}
+			})
+		},
+		[setConfig]
 	)
 
 	const [recentFeedbacks, setRecentFeedbacks] = useState([])
@@ -270,17 +343,63 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 			})
 
 			socketEmit(context.socket, 'feedback_get_defaults', [feedbackType]).then(([fb]) => {
-				updateConfig('config', [...config, fb])
+				setConfig((oldConfig) => ({
+					...oldConfig,
+					config: [...oldConfig.config, fb],
+				}))
 			})
 		},
-		[context.socket, config, updateConfig]
+		[context.socket, setConfig]
 	)
 
-	const delRow = (i) => {
-		const config2 = [...config]
-		config2.splice(i, 1)
-		updateConfig('config', config2)
-	}
+	const delRow = useCallback(
+		(feedbackId) => {
+			setConfig((oldConfig) => {
+				const newFeedbacks = oldConfig.config.filter((fb) => fb.id !== feedbackId)
+
+				return {
+					...oldConfig,
+					config: newFeedbacks,
+				}
+			})
+		},
+		[setConfig]
+	)
+
+	const learnRow = useCallback(
+		(feedbackId) => {
+			if (feedbacksRef.current) {
+				const oldFeedback = feedbacksRef.current.find((fb) => fb.id === feedbackId)
+				if (oldFeedback) {
+					socketEmit(context.socket, 'feedback_learn_single', [oldFeedback])
+						.then(([newOptions]) => {
+							if (newOptions) {
+								setConfig((oldConfig) => {
+									const newFeedbacks = oldConfig.config.map((fb) => {
+										if (fb.id === feedbackId) {
+											return {
+												...fb,
+												options: newOptions,
+											}
+										} else {
+											return fb
+										}
+									})
+									return {
+										...oldConfig,
+										config: newFeedbacks,
+									}
+								})
+							}
+						})
+						.catch((e) => {
+							console.error('Learn failed', e)
+						})
+				}
+			}
+		},
+		[context.socket, setConfig]
+	)
 
 	// This is a bit of a hack:
 	if (pluginSpec.type === 'feedback') {
@@ -292,11 +411,11 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 							<tr key={i}>
 								<td>
 									<MyErrorBoundary>
-										<FeedbackEditor
-											isOnBank={false}
+										<FeedbackEditorRow
 											feedback={conf}
-											setValue={(id, k, v) => updateFeedbackOptionConfig(i, k, v)}
-											innerDelete={() => delRow(i)}
+											updateFeedbackOptionConfig={updateFeedbackOptionConfig}
+											delRow={delRow}
+											learnRow={learnRow}
 										/>
 									</MyErrorBoundary>
 								</td>
@@ -331,6 +450,25 @@ function TriggerEditModalConfig({ pluginSpec, config, updateConfig }) {
 				</CFormGroup>
 			))}
 		</>
+	)
+}
+
+function FeedbackEditorRow({ feedback, updateFeedbackOptionConfig, delRow, learnRow }) {
+	const innerDelete = useCallback(() => {
+		delRow(feedback.id)
+	}, [feedback.id, delRow])
+	const innerLearn = useCallback(() => {
+		learnRow(feedback.id)
+	}, [feedback.id, learnRow])
+
+	return (
+		<FeedbackEditor
+			isOnBank={false}
+			feedback={feedback}
+			setValue={updateFeedbackOptionConfig}
+			innerDelete={innerDelete}
+			innerLearn={innerLearn}
+		/>
 	)
 }
 

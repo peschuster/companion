@@ -1,5 +1,253 @@
 # Bitfocus Companion
 
+## Companion v2.4.2 - Release Notes
+
+### 🐞 BUG FIXES
+
+- UI crash after saving a trigger
+- UI crash if module status is not a string
+- Missing libasound2 in docker image
+
+### 🐞 MODULE FIXES
+
+- bitfocus-companion
+- equipson-lightshark
+- generic-artnet
+- generic-sacn
+- haivision-connectdvr
+- zoom-osc-iso
+
+## Companion v2.4.1 - Release Notes
+
+### 🐞 BUG FIXES
+
+- X-keys LEDs always show colors from page 1
+- Fixes for Loupedeck support
+- Dropdowns using `allowCustom` reject values if not using regex
+- Export page broken (#2210)
+- Colorpicker in modals broken (#2203)
+
+### 🐞 MODULE FIXES
+
+- analogway-awj
+- bmd-atem
+- esphome-api
+- figure53-qlab-advance
+- middleman-adit
+- roland-v60hd
+- zoom-osc-iso
+
+## Companion v2.4.0 - Release Notes
+
+### 📣 CORE FEATURES AND IMPROVEMENTS
+
+- Option to enable react-dnd-touch-backend 'experiment'
+- Filter in variables table (#1899)
+- Additional custom variable internal actions
+- Option to persist custom variable
+- Support for new Stream Deck XL revision
+- Loupedeck Live support (#2110)
+- Loupedeck Live S support
+- Stream Deck + support
+
+### 🐞 BUG FIXES
+
+- Increase yarn timeout to avoid failed builds
+- Fix multi-dropdown `maxSelection` property
+- Dropdown not enforcing regex when adding custom values
+- Satellite bitmap rotation
+- Add action/feedback modal fails to display error
+- Missing method on X-keys
+- Colors for bottom row of X-keys buttons not showing
+- Docker: use correct directory when local modules are added (#2163)
+- Select input dropdowns being clipped inside scroll regions
+- Color picker posititioning
+- Restore custom variable values when importing config (#2191)
+- Dropdowns in modals broken (#2196)
+
+### 🧩 NEW MODULES
+
+- analogway-awj
+- arri-tally
+- audac-mtx
+- birddog-central
+- blustream-hdmimatrix
+- cleartouch-ippctrl
+- discord-api
+- djsoft-radioboss
+- ecamm-live
+- eiki-wspprojector
+- generic-filereader
+- generic-ping
+- google-sheets
+- middleman-adit
+- neumannmueller-stageflow
+- nortek-bluebolt
+- pnh-soundr
+- rationalacoustics-smaart4
+- rgblink-mini
+- rgblink-x3
+- roland-v160hd
+- televic-dcerno
+- tplink-kasasmartstrip
+- tslproducts-umdlistener
+- utahscientific-bpspanel
+- vdwall-lvp615
+- vislink-ulrx-ld
+- vizrt-tcp-engine-trio
+
+### 👍🏻 MODULE IMPROVEMENTS
+
+- aja-helo
+- arkaos-mediamaster
+- barco-eventmaster
+- behringer-x32
+- behringer-xair
+- birddog-ptz
+- bitfocus-companion
+- bmd-atem
+- bmd-hyperdeck
+- bmd-webpresenterhd
+- denon-receiver
+- figure53-qlab-advance
+- generic-pjlink
+- generic-tcp-serial
+- generic-tcp-udp
+- getontime-ontime
+- h2r-graphics
+- imimot-mitti
+- ipl-ocp
+- kramer-matrix
+- liminalet-zoomosc
+- ltn-schedule
+- magewell-proconvert-decoder
+- magewell-ultrastream
+- malighting-grandma2
+- motu-avb
+- newtek-tricaster
+- obs-studio
+- panasonic-kairos
+- panasonic-ptz
+- pixap-pixtimerpro
+- pnh-opencountdown
+- presentationtools-aps
+- presentationtools-cuetimer
+- rationalacoustics-smaart3
+- renewedvision-propresenter
+- roland-v60hd
+- rossvideo-videoserver
+- seervision-suite
+- softron-movierecorder
+- sony-visca
+- studiocoast-vmix
+- techministry-spotifycontroller
+- tesmart-hdmimatrix
+- timemachines-clock
+- tslproducts-umd
+- vdo-ninja
+- videolan-vlc
+- vizio-smartcast
+- yamaha-rcp
+- zoom-osc-iso
+
+## Companion v2.3.1 - Release Notes
+
+### 🐞 BUG FIXES
+
+- Presets panel sometimes erroring after adding an instance
+- Dockerfile install `iputils-ping` (#2084)
+- Detect satellite sockets going stale and close them
+- Calls to child.send for disconnected usb devices fail
+- Clone cached actions/feedbacks/presets so that UI can reliably get changes
+- "Failed to build list of modules" due to module keyword issues (#2111)
+- Unable to enable/disable triggers via action (#2082)
+
+### 🐞 MODULE FIXES
+
+- bitfocus-companion
+- bmd-atem
+- bytehive-playoutbee
+- evertz-quartz
+- generic-tcp-serial
+- haivision-connectdvr
+- homeassistant-server
+- planningcenter-serviceslive
+- pnh-opencountdown
+- sony-cled
+- techministry-spotifycontroller
+- tslproducts-umd
+- vicreo-hotkey
+- vystem-api
+- zoom-osc-iso
+
+## Companion v2.3.0 - Release Notes
+
+### 📣 CORE FEATURES AND IMPROVEMENTS
+
+- Set custom variables with the remote protocols (HTTP, UDP, TCP & OSC)
+- Support the new revision of the Streamdeck Mini
+- Optimise data sending to the browser, to make usage smoother over a VPN
+- Add 'learn' button for actions and feedbacks to populate with the current values (not implemented in many modules)
+- Modules can handle some http requests, allowing for simpler workflows
+
+### 🐞 BUG FIXES
+
+- Better error handling in the UI
+- Improve UI performance
+- Sanitise filename of exports for unusual characters
+- Add connection filter box crash with certain strings
+- Time interval triggers could get into an infinite loop
+
+### 🧩 NEW MODULES
+
+- biamp-tesira
+- devantech-ds
+- epson-businesspj
+- equipson-lightshark
+- evertz-quartz
+- getontime-ontime
+- notion-timestamp
+- pnh-opencountdown
+- sony-cled
+- techministry-spotifycontroller
+- teradek-prismflex
+- videocom-zoom-bridge
+- zoom-osc-iso
+
+### 👍🏻 MODULE IMPROVEMENTS
+
+- aja-kumo
+- audiostrom-liveprofessor
+- birddog-ptz
+- bitfocus-companion
+- bitfocus-snapshot
+- bmd-atem
+- bmd-hyperdeck
+- bmd-videohub
+- bmd-webpresenterhd
+- dataton-watchout
+- draco-tera
+- figure53-qlab-advance
+- fora-hvs
+- generic-pjlink
+- haivision-kbencoder
+- ipl-ocp
+- kramer-vp727
+- lgtv-display
+- newbluefx-titler
+- newtek-ndistudiomonitor
+- panasonic-kairos
+- phillips-hue
+- sennheiser-evolutionwireless
+- studiocoast-vmix
+- teradek-vidiu
+- theatrixx-xpresscue
+- timemachines-clock
+- toggl-track
+- tow-mixeffect
+- vicreo-hotkey
+- videolan-vlc
+
 ## Companion v2.2.3 - Release Notes
 
 ### 🐞 BUG FIXES
